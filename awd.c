@@ -4,6 +4,8 @@
 #include "awd.h"
 #include "aes/aes.h"
 #include "num_utils.h"
+#include "pattimura/pattimura.h"
+#include "pattimura/utils.h"
 
 #define ECB 1
 #define is_bit_set(b, l, p) ((b[p / 8] >> (7 - (p % 8))) & 1)
@@ -192,6 +194,53 @@ double *ac_AES_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigned
 
 }
 
+double *ac_Pattimura_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigned int bit_length) {
+
+    double *k_aval = calloc(bit_length, sizeof(double));
+    unsigned int byte_length = bit_length / 8u;
+    unsigned int i;
+    unsigned int w;
+    unsigned int ei;
+
+    byte *key = read_hex_line(fileKey,0,byte_length*2);
+    byte *C  = malloc(byte_length);
+    byte *Ci = malloc(byte_length);
+
+    PATTIMURA_Context ctx;
+    PATTIMURA_Open(&ctx, key, 128, PATTIMURA_ECB_ENC, PATTIMURA_default_userbox);
+
+    for (i = 0; i < num_inputs; ++i) {
+        byte *P = read_hex_line(filePlaintext,i,byte_length*2);
+
+        PATTIMURA_EncryptDecript(&ctx, C, P, 1);
+        for (ei = 0; ei < bit_length; ++ei) {
+            flip_bit(P, byte_length, ei);
+            PATTIMURA_EncryptDecript(&ctx, Ci, P, 1);
+
+            byte *Dei = xor_bytes(C, Ci, byte_length);
+            w = hamming_weight_bytes(Dei, byte_length);
+
+            k_aval[ei] += w;
+            flip_bit(P, byte_length, ei);
+
+            free(Dei);
+        }
+        free(P);
+    }
+
+    float div = (float)num_inputs * bit_length;
+    for (ei = 0; ei < bit_length; ++ei) {
+        k_aval[ei] /= div;
+    }
+
+    free(C);
+    free(Ci);
+    free(key);
+
+    return k_aval;
+
+}
+
 float **sac_AES(int num_inputs, unsigned int bit_length) {
 
     float **sac = alloc_float_matrix(bit_length, bit_length);
@@ -255,6 +304,54 @@ float **sac_AES_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigne
         for (ei = 0; ei < bit_length; ++ei) {
             flip_bit(P, byte_length, ei);
             AES128_ECB_encrypt(P, key, Ci);
+
+            byte *Dei = xor_bytes(C, Ci, byte_length);
+
+            for (ej = 0; ej < bit_length; ++ej) {
+                sac[ei][ej] += is_bit_set(Dei, byte_length, ej);
+            }
+            flip_bit(P, byte_length, ei);
+
+            free(Dei);
+        }
+        free(P);
+    }
+
+    float div = (float)num_inputs;
+    for (ei = 0; ei < bit_length; ++ei) {
+        for (ej = 0; ej < bit_length; ++ej) {
+            sac[ei][ej] /= div;
+        }
+    }
+
+    free(C);
+    free(Ci);
+    free(key);
+
+    return sac;
+}
+
+float **sac_Pattimura_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigned int bit_length) {
+
+    float **sac = alloc_float_matrix(bit_length, bit_length);
+    unsigned int byte_length = bit_length / 8u;
+    unsigned int i;
+    unsigned int ei, ej;
+
+    byte *key = read_hex_line(fileKey,0,byte_length*2);
+    byte *C  = malloc(byte_length);
+    byte *Ci = malloc(byte_length);
+
+    PATTIMURA_Context ctx;
+    PATTIMURA_Open(&ctx, key, 128, PATTIMURA_ECB_ENC, PATTIMURA_default_userbox);
+
+    for (i = 0; i < num_inputs; ++i) {
+        byte *P = read_hex_line(filePlaintext,i,byte_length*2);
+
+        PATTIMURA_EncryptDecript(&ctx, C, P, 1);
+        for (ei = 0; ei < bit_length; ++ei) {
+            flip_bit(P, byte_length, ei);
+            PATTIMURA_EncryptDecript(&ctx, Ci, P, 1);
 
             byte *Dei = xor_bytes(C, Ci, byte_length);
 
@@ -365,6 +462,46 @@ unsigned int **awd_count_AES_file(FILE *filePlaintext, FILE *fileKey, int num_in
     return awd_matrix;
 }
 
+unsigned int **awd_count_Pattimura_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigned int bit_length) {
+
+    unsigned int **awd_matrix = alloc_uint_matrix(bit_length,bit_length +1);
+    unsigned int byte_length = bit_length / 8u;
+    unsigned int i,j;
+    unsigned int w;
+
+    byte *key = read_hex_line(fileKey,0,byte_length*2);
+    byte *C  = malloc(byte_length);
+    byte *Ci = malloc(byte_length);
+
+    PATTIMURA_Context ctx;
+    PATTIMURA_Open(&ctx, key, 128, PATTIMURA_ECB_ENC, PATTIMURA_default_userbox);
+
+    for (i = 0; i < num_inputs; ++i) {
+        byte *P = read_hex_line(filePlaintext,i,byte_length*2);
+        PATTIMURA_EncryptDecript(&ctx, C, P, 1);
+
+        for (j = 0; j < bit_length; ++j) {
+            flip_bit(P, byte_length, j);
+            PATTIMURA_EncryptDecript(&ctx, Ci, P, 1);
+
+            byte *Dei = xor_bytes(C, Ci, byte_length);
+            w = hamming_weight_bytes(Dei, byte_length);
+
+            awd_matrix[j][w] += 1;
+            flip_bit(P, byte_length, j);
+
+            free(Dei);
+        }
+        free(P);
+    }
+
+    free(C);
+    free(Ci);
+    free(key);
+
+    return awd_matrix;
+}
+
 double bic_AES_file(FILE *filePlaintext, FILE *fileKey, unsigned int num_inputs, unsigned int bit_length) {
     unsigned int **sum = alloc_uint_matrix(bit_length, bit_length);
     unsigned int ***sumAB = malloc(bit_length * sizeof(unsigned int **));
@@ -392,6 +529,82 @@ double bic_AES_file(FILE *filePlaintext, FILE *fileKey, unsigned int num_inputs,
         for (i = 0; i < bit_length; ++i) {
             flip_bit(P, byte_length, i);
             AES128_ECB_encrypt(P, key, Ci);
+
+            byte *Dei = xor_bytes(C, Ci, byte_length);
+
+            for (j = 0; j < bit_length; ++j) {
+                sum[i][j] += is_bit_set(Dei, byte_length, j);
+
+                for (k = j + 1; k < bit_length; ++k) {
+                    sumAB[i][j][k] += is_bit_set(Dei, byte_length, j) & is_bit_set(Dei, byte_length, k);
+                }
+            }
+
+            free(Dei);
+            flip_bit(P, byte_length, i);
+        }
+        free(P);
+    }
+
+    for (i = 0; i < bit_length; ++i) {
+        for (j = 0; j < bit_length; ++j) {
+            for (k = j + 1; k < bit_length; ++k) {
+                div  = sqrt(sum[i][j] * (num_inputs - sum[i][j])) * sqrt(sum[i][k] * (num_inputs - sum[i][k]));
+                if (div == 0.0)
+                    corr = 0.0;
+                else {
+                    corr = (double)num_inputs * sumAB[i][j][k] - (sum[i][j] * sum[i][k]);
+                    corr /= div;
+                }
+                corr = fabs(corr);
+                if (corr > maxCorr) maxCorr = corr;
+            }
+        }
+    }
+
+    free(sum);
+
+    for (i = 0; i < bit_length; ++i) {
+        free(sumAB[i]);
+    }
+
+    free(key);
+    free(C);
+    free(Ci);
+
+    return maxCorr;
+}
+
+double bic_Pattimura_file(FILE *filePlaintext, FILE *fileKey, unsigned int num_inputs, unsigned int bit_length) {
+    unsigned int **sum = alloc_uint_matrix(bit_length, bit_length);
+    unsigned int ***sumAB = malloc(bit_length * sizeof(unsigned int **));
+    unsigned int byte_length = bit_length / 8u;
+    unsigned int X;
+    unsigned int i, j, k;
+
+    double corr;
+    double maxCorr = 0;
+    double div;
+
+    byte *key = read_hex_line(fileKey, 0, byte_length * 2);
+    byte *C  = malloc(byte_length);
+    byte *Ci = malloc(byte_length);
+
+    PATTIMURA_Context ctx;
+    PATTIMURA_Open(&ctx, key, 128, PATTIMURA_ECB_ENC, PATTIMURA_default_userbox);
+
+    for (i = 0; i < bit_length; ++i) {
+        sumAB[i] = alloc_uint_matrix(bit_length, bit_length);
+    }
+
+    for (X = 0; X < num_inputs; ++X) {
+        byte *P = read_hex_line(filePlaintext, X, byte_length * 2);
+
+        PATTIMURA_EncryptDecript(&ctx, C, P, 1);
+
+        for (i = 0; i < bit_length; ++i) {
+            flip_bit(P, byte_length, i);
+            PATTIMURA_EncryptDecript(&ctx, Ci, P, 1);
 
             byte *Dei = xor_bytes(C, Ci, byte_length);
 

@@ -28,282 +28,168 @@ unsigned int sbox_aes[256]      = {
     0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
+unsigned int sbox_pattimura[256] = {
+    0xc0, 0x5d, 0x5b, 0xfc, 0x73, 0x46, 0x16, 0xc3, 0x3c, 0xbb, 0xdc, 0x15, 0x19, 0x79, 0x63, 0x62,
+    0x39, 0x0e, 0xa2, 0xfe, 0xe7, 0xc5, 0x03, 0x1a, 0x2e, 0xc7, 0x3b, 0x08, 0xda, 0xd1, 0xcf, 0xee,
+    0x37, 0x5a, 0x2f, 0x44, 0x71, 0xba, 0x24, 0x7b, 0xd3, 0x43, 0xde, 0x95, 0xdf, 0x4f, 0x2b, 0xf1,
+    0xeb, 0xc4, 0xae, 0x5c, 0x7d, 0xbe, 0x11, 0x52, 0xd4, 0xfb, 0x2d, 0x51, 0x34, 0xf3, 0x82, 0xef,
+    0x7e, 0x33, 0x76, 0x64, 0xf6, 0x7c, 0x9f, 0xff, 0x91, 0x97, 0xe2, 0xe9, 0x89, 0xec, 0x17, 0x9b,
+    0xa5, 0x31, 0x32, 0xe4, 0x65, 0xd0, 0xac, 0x0c, 0xb1, 0x92, 0xb0, 0x42, 0x8c, 0x69, 0x2c, 0xf4,
+    0xd8, 0xaa, 0x8f, 0xe6, 0x1e, 0xb2, 0x00, 0xd7, 0x59, 0x0d, 0xb8, 0x38, 0xe5, 0x3f, 0x29, 0xed,
+    0x8b, 0x58, 0x21, 0x57, 0xb9, 0xf2, 0x2a, 0x12, 0x30, 0x02, 0x3d, 0xf7, 0xb5, 0x05, 0x35, 0xad,
+    0x23, 0xa8, 0x3e, 0x68, 0xa4, 0x72, 0xd5, 0x77, 0x7f, 0xa7, 0x90, 0x9c, 0x54, 0x53, 0x6e, 0x70,
+    0xcd, 0x74, 0xd6, 0x66, 0xe8, 0xca, 0x9a, 0x01, 0xdd, 0xcc, 0x6f, 0xd9, 0x25, 0x80, 0x06, 0x20,
+    0x48, 0xf5, 0xa9, 0xf8, 0x6c, 0xf0, 0xe3, 0x45, 0x14, 0x49, 0x85, 0xb6, 0xbf, 0x84, 0xbc, 0x9e,
+    0x26, 0x93, 0xe1, 0xcb, 0xc2, 0xb4, 0xb7, 0x6a, 0x28, 0xd2, 0xab, 0xce, 0x8e, 0x41, 0x47, 0x22,
+    0x0a, 0x1f, 0x3a, 0x10, 0x50, 0x1c, 0x94, 0xaf, 0x4d, 0x07, 0xa1, 0xfd, 0xb3, 0x83, 0x75, 0xbd,
+    0x0f, 0x4a, 0x78, 0x0b, 0x98, 0x96, 0x1b, 0x60, 0xa3, 0xdb, 0xea, 0x04, 0x09, 0x56, 0x4e, 0x61,
+    0xc6, 0x36, 0xf9, 0xfa, 0x5e, 0x18, 0xe0, 0x4c, 0x99, 0x6b, 0x4b, 0x87, 0xc8, 0x1d, 0xa6, 0xc1,
+    0x81, 0xc9, 0x55, 0x40, 0x9d, 0x67, 0x13, 0x88, 0x5f, 0x7a, 0x27, 0x8d, 0x8a, 0x6d, 0x86, 0xa0
+};
 
 int main() {
 
     unsigned int i,j,m,n;
     unsigned int samples = 10000;
     unsigned int bit_aes = 128;    
-    double error = 0, maxError = 0;
-    int bit_flip, weight;
+    double error1 = 0, error2 = 0;
+    double maxAC1 = 0, maxSAC1 = 0, maxAWDR1 = 0;
+    double maxAC2 = 0, maxSAC2 = 0, maxAWDR2 = 0;
+    int bit_flip, weight, maxXor1 = 0, maxXor2 = 0;
     m = n = BIT;
-    FILE *filePlaintext, *fileKey, *fileOutput, *fileAWDFile, *fileAWDRandom;
-    FILE *fileXorTablePresent, *fileXorTableAES, *fileLATPresent, *fileLATAES;
+    FILE *filePlaintext, *fileKey, *fileOutput;
+    FILE *fileACAES, *fileSACAES, *fileXorTableAES, *fileLATAES, *fileAWDAES;
+    FILE *fileACPattimura, *fileSACPattimura, *fileLATPattimura, *fileXorTablePattimura, *fileAWDPattimura;
     filePlaintext   = fopen("plaintext1.txt","r");
     fileKey         = fopen("key.txt","r");
-    fileOutput      = fopen("OutputUji.txt","w");
-    fileAWDFile     = fopen("UjiAWD_AES_File.xls","w");
-    fileAWDRandom   = fopen("UjiAWD_AES_Random.xls","w");
-    fileLATPresent  = fopen("NilaiLAT_Present.txt","w");
-    fileLATAES      = fopen("NilaiLAT_AES.txt","w");
-    fileXorTablePresent = fopen("XorTable_Present.txt","w");
-    fileXorTableAES     = fopen("XorTable_AES.txt","w");
+    fileOutput      = fopen("OutputUjiPattimura.txt","w");
+
+    fileAWDAES      = fopen("AES/UjiAWD_AES_File.xls","w");
+    fileLATAES      = fopen("AES/NilaiLAT_AES.txt","w");
+    fileXorTableAES = fopen("AES/XorTable_AES.txt","w");
+    fileACAES       = fopen("AES/HasilAC_AES.txt","w");
+    fileSACAES      = fopen("AES/HasilSAC_AES.txt","w");
+
+    fileAWDPattimura        = fopen("Pattimura/UjiAWD_Pattimura_File.xls","w");
+    fileLATPattimura        = fopen("Pattimura/NilaiLAT_Pattimura.txt","w");
+    fileXorTablePattimura   = fopen("Pattimura/XorTable_Pattimura.txt","w");
+    fileACPattimura         = fopen("Pattimura/HasilAC_Pattimura.txt","w");
+    fileSACPattimura        = fopen("Pattimura/HasilSAC_Pattimura.txt","w");
 
     time_t start, stop;
     time(&start);
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [1] Avalanche Criterion [SBox AES] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    float *ac = sbox_ac(sbox_aes,m);
-    for (i = 0; i < m; ++i) {
-        fprintf(fileOutput," %.2f", ac[i]);
-        error = fabs(0.5 - ac[i]);
-        if (error > maxError) {
-            maxError = error;
-        }
-    }
-    fprintf(fileOutput,"\n Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
+    // Algorithm Test [AC, SAC, BIC, AWD]
+    double *acAES   = ac_AES_file(filePlaintext,fileKey,samples,bit_aes);
+    double *acPatt  = ac_Pattimura_file(filePlaintext,fileKey,samples,bit_aes);
+    float **sacAES  = sac_AES_file(filePlaintext,fileKey,samples,bit_aes);
+    float **sacPatt = sac_Pattimura_file(filePlaintext,fileKey,samples,bit_aes);
+    double bicAES   = bic_AES_file(filePlaintext,fileKey,samples,bit_aes);
+    double bicPatt  = bic_Pattimura_file(filePlaintext,fileKey,samples,bit_aes);
+    unsigned int **awdAES   = awd_count_AES_file(filePlaintext,fileKey,samples,bit_aes);
+    unsigned int **awdPatt  = awd_count_Pattimura_file(filePlaintext,fileKey,samples,bit_aes);
+    unsigned int *binomAll  = awd_binom_distrib(samples,bit_aes +1);
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [2] Avalanche Criterion [AES Algorithm - Random] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    srand(samples);
-    double *acAlg = ac_AES(samples,bit_aes);
+    // S-Box Test [XorTable, LAT, Non-Linierity]
+    unsigned int **xortable_aes  = sbox_differential_table(sbox_aes,BIT,BIT);
+    unsigned int **xortable_patt = sbox_differential_table(sbox_pattimura,BIT,BIT);
+    unsigned int **lat_aes       = sbox_linearity(sbox_aes,BIT,BIT);
+    unsigned int **lat_patt      = sbox_linearity(sbox_pattimura,BIT,BIT);
+    unsigned int nonLin_AES      = sbox_nonlinearity(sbox_aes,BIT,BIT);
+    unsigned int nonLin_Patt     = sbox_nonlinearity(sbox_pattimura,BIT,BIT);
+
+    // Print to File
+    // #1. Avalanche Criterion :
     for (i = 0; i < bit_aes; ++i) {
-        fprintf(fileOutput," %.6lf\n", acAlg[i]);
-        error = fabs(0.5 - acAlg[i]);
-        if (error > maxError) {
-            maxError = error;
-        }
+        fprintf(fileACAES,      " %.6lf\n", acAES[i]);
+        fprintf(fileACPattimura," %.6lf\n", acPatt[i]);
+        error1 = fabs(0.5 - acAES[i]);
+        error2 = fabs(0.5 - acPatt[i]);
+        if (error1 > maxAC1) maxAC1 = error1;
+        if (error2 > maxAC2) maxAC2 = error2;
     }
-    fprintf(fileOutput," Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
+    error1 = error2 = 0;
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [3] Avalanche Criterion [AES Algorithm - File] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    double *acAlgFile = ac_AES_file(filePlaintext,fileKey,samples,bit_aes);
-    for (i = 0; i < bit_aes; ++i) {
-        fprintf(fileOutput," %.6lf\n", acAlgFile[i]);
-        error = fabs(0.5 - acAlgFile[i]);
-        if (error > maxError) {
-            maxError = error;
-        }
-    }
-    fprintf(fileOutput," Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [4] Strict Avalanche Criterion [SBox AES] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    float **sac = sbox_sac_matrix(sbox_aes,m,n);
-    for (i = 0; i < m; ++i) {
-        for (j = 0; j < n; ++j) {
-            fprintf(fileOutput," %5.3f ", sac[i][j]);
-            error = fabs(0.5 - sac[i][j]);
-            if (error > maxError) {
-                maxError = error;
-            }
-        }
-        fprintf(fileOutput,"\n");
-    }
-    fprintf(fileOutput," Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [5] Strict Avalanche Criterion [AES Algorithm - Random] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    float **sacAlg = sac_AES(samples,bit_aes);
+    // #2. Strict Avalanche Criterion :
     for (i = 0; i < bit_aes; ++i) {
         for (j = 0; j < bit_aes; ++j) {
-            fprintf(fileOutput," %5.3f ", sacAlg[i][j]);
-            error = fabs(0.5 - sacAlg[i][j]);
-            if (error > maxError) {
-                maxError = error;
-            }
+            fprintf(fileSACAES,      " %.6lf\n", sacAES[i][j]);
+            fprintf(fileSACPattimura," %.6lf\n", sacPatt[i][j]);
+            error1 = fabs(0.5 - sacAES[i][j]);
+            error2 = fabs(0.5 - sacPatt[i][j]);
+            if (error1 > maxSAC1) maxSAC1 = error1;
+            if (error2 > maxSAC2) maxSAC2 = error2;
         }
-        fprintf(fileOutput,"\n");
+        fprintf(fileSACAES,"\n");
+        fprintf(fileSACPattimura,"\n");
     }
-    fprintf(fileOutput," Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
+    error1 = error2 = 0;
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [6] Strict Avalanche Criterion [AES Algorithm - File] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    float **sacAlgFile = sac_AES_file(filePlaintext,fileKey,samples,bit_aes);
-    for (i = 0; i < bit_aes; ++i) {
-        for (j = 0; j < bit_aes; ++j) {
-            fprintf(fileOutput," %5.3f ", sacAlgFile[i][j]);
-            error = fabs(0.5 - sacAlgFile[i][j]);
-            if (error > maxError) {
-                maxError = error;
-            }
-        }
-        fprintf(fileOutput,"\n");
-    }
-    fprintf(fileOutput," Max Error : %.5f\n",maxError);
-    fprintf(fileOutput,"\n");
-    maxError = error = 0;
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [7] Avalanche Weight Distribution [AES Algorithm - Random] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," ===========================NILAI AWD========================\n");
-    fprintf(fileOutput," \t\t\t[ Ada pada file : UjiAWD_AES_Random.xls ]\n");
-    unsigned int **awd_array_random = awd_count_AES(samples,bit_aes);
-    unsigned int *binomAll = awd_binom_distrib(samples,bit_aes +1);
+    // #3. Avalanche Weight Distribution :
     for (bit_flip = 0; bit_flip < bit_aes; ++bit_flip) {
         for (weight = 0; weight < bit_aes +1; ++weight) {
-            fprintf(fileAWDRandom," %d\t",awd_array_random[bit_flip][weight]);
+            fprintf(fileAWDAES,         " %d\t",awdAES[bit_flip][weight]);
+            fprintf(fileAWDPattimura,   " %d\t",awdPatt[bit_flip][weight]);
         }
-        fprintf(fileAWDRandom,"\n");
+        fprintf(fileAWDAES,"\n");
+        fprintf(fileAWDPattimura,"\n");
     }
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," =======================NILAI RESEMBLANCE====================\n");
-    double nilaiRRandom[bit_aes];
+    double resemAES[bit_aes],resemPatt[bit_aes];
     for (i = 0; i < bit_aes; ++i) {
-        nilaiRRandom[i] = awd_resemblance(awd_array_random[i],binomAll,bit_aes +1, samples);
-        fprintf(fileOutput," R[%d] : %lf\n",i,nilaiRRandom[i]);
-    }
-    fprintf(fileOutput,"\n");
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [8] Avalanche Weight Distribution [AES Algorithm - File] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," ===========================NILAI AWD========================\n");
-    fprintf(fileOutput," \t\t\t[ Ada pada file : UjiAWD_AES_File.xls ]\n");
-    unsigned int **awd_array_file = awd_count_AES_file(filePlaintext,fileKey,samples,bit_aes);
-    for (bit_flip = 0; bit_flip < bit_aes; ++bit_flip) {
-        for (weight = 0; weight < bit_aes + 1; ++weight) {
-            fprintf(fileAWDFile," %d\t",awd_array_file[bit_flip][weight]);
-        }
-        fprintf(fileAWDFile,"\n");
+        resemAES[i]     = awd_resemblance(awdAES[i],binomAll,bit_aes +1, samples);
+        resemPatt[i]    = awd_resemblance(awdPatt[i],binomAll,bit_aes +1, samples);
+        if (resemAES[i] > maxAWDR1)    maxAWDR1 = resemAES[i];
+        if (resemPatt[i] > maxAWDR2)   maxAWDR2 = resemPatt[i];
     }
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," =======================NILAI RESEMBLANCE====================\n");
-    double nilaiR[bit_aes];
-    for (i = 0; i < bit_aes; ++i) {
-        nilaiR[i] = awd_resemblance(awd_array_file[i],binomAll,bit_aes +1, samples);
-        fprintf(fileOutput," R[%d] : %lf\n",i,nilaiR[i]);
-    }
-    fprintf(fileOutput,"\n");
-
-//    fprintf(fileOutput," ============================================================\n");
-//    fprintf(fileOutput," [9] Bit Independence Criterion [SBox AES] :\n");
-//    fprintf(fileOutput," ============================================================\n");
-//    double bic = sbox_bic(sbox_aes,m,n);
-//    fprintf(fileOutput," Nilai MAX BIC SBox AES : %lf\n",bic);
-//    fprintf(fileOutput,"\n");
-
-//    fprintf(fileOutput," ============================================================\n");
-//    fprintf(fileOutput," [10] Bit Independence Criterion [AES Algorithm - File] :\n");
-//    fprintf(fileOutput," ============================================================\n");
-//    double bicFile = bic_AES_file(filePlaintext,fileKey,1000,bit_aes);
-//    fprintf(fileOutput," Nilai MAX BIC AES Algorithm - File : %lf\n",bicFile);
-//    fprintf(fileOutput,"\n");
-
-//    fprintf(fileOutput," ============================================================\n");
-//    fprintf(fileOutput," [11] Bit Independence Criterion [AES Algorithm - Random] :\n");
-//    fprintf(fileOutput," ============================================================\n");
-//    double bicRandom = bic_AES_random(1000,bit_aes);
-//    fprintf(fileOutput," Nilai MAX BIC AES Algorithm - Random : %lf\n",bicRandom);
-//    fprintf(fileOutput,"\n");
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [12] XORTable Test [SBox Present] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    unsigned int **xortable_present = sbox_differential_table(sbox_present,BITP,BITP);
-    int maxXor = 0;
-    for (i = 0; i < two_power(BITP); ++i) {
-        for (j = 0; j < two_power(BITP); ++j) {
-            if (xortable_present[i][j] != 0) {
-                fprintf(fileXorTablePresent," [%.2x][%.2x] : %d\n",i,j,xortable_present[i][j]);
-                if (xortable_present[i][j] > maxXor && xortable_present[i][j] != two_power(BITP)) {
-                    maxXor = xortable_present[i][j];
-                }
-            }
-        }
-    }
-    fprintf(fileOutput," Nilai Max XORTable Present : %d\n",maxXor);
-    fprintf(fileOutput,"\n");
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [13] XORTable Test [SBox AES] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    unsigned int **xortable_aes = sbox_differential_table(sbox_aes,BIT,BIT);
-    maxXor = 0;
+    // #4. XorTable SBox :
     for (i = 0; i < two_power(BIT); ++i) {
         for (j = 0; j < two_power(BIT); ++j) {
             if (xortable_aes[i][j] != 0) {
                 fprintf(fileXorTableAES," [%.2x][%.2x] : %d\n",i,j,xortable_aes[i][j]);
-                if (xortable_aes[i][j] > maxXor && xortable_aes[i][j] != two_power(BIT)) {
-                    maxXor = xortable_aes[i][j];
+                if (xortable_aes[i][j] > maxXor1 && xortable_aes[i][j] != two_power(BIT)) {
+                    maxXor1 = xortable_aes[i][j];
+                }
+            }
+            if (xortable_patt[i][j] != 0) {
+                fprintf(fileXorTablePattimura," [%.2x][%.2x] : %d\n",i,j,xortable_patt[i][j]);
+                if (xortable_patt[i][j] > maxXor2 && xortable_patt[i][j] != two_power(BIT)) {
+                    maxXor2 = xortable_patt[i][j];
                 }
             }
         }
     }
-    fprintf(fileOutput," Nilai Max XORTable AES : %d\n",maxXor);
-    fprintf(fileOutput,"\n");
 
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [14] Liniear Approximation Table [SBox Present] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    unsigned int **lat_present = sbox_linear_approx_table(sbox_present,BITP,BITP);
-    int maxLAT = 0;
-    for (i = 0; i < two_power(4); ++i) {
-        for (j = 0; j < two_power(4); ++j) {
-            fprintf(fileLATPresent," [%.2x][%.2x] : %d\n",i,j,lat_present[i][j] - two_power(BITP)/2);
-            if (lat_present[i][j] > maxLAT && lat_present[i][j] != two_power(BITP)) {
-                maxLAT = lat_present[i][j];
-            }
-        }
-    }
-    fprintf(fileOutput," Nilai Max LAT Present : %d\n",maxLAT - two_power(BITP)/2);
-    fprintf(fileOutput,"\n");
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [15] Liniear Approximation Table [SBox AES] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    unsigned int **lat_aes = sbox_linear_approx_table(sbox_aes,BIT,BIT);
-    maxLAT = 0;
-    for (i = 0; i < two_power(BIT); ++i) {
-        for (j = 0; j < two_power(BIT); ++j) {
-            fprintf(fileLATAES," [%.2x][%.2x] : %d\n",i,j,lat_aes[i][j] - two_power(BIT)/2);
-            if (lat_aes[i][j] > maxLAT && lat_aes[i][j] != two_power(BIT)) {
-                maxLAT = lat_aes[i][j];
-            }
-        }
-    }
-    fprintf(fileOutput," Nilai Max LAT AES : %d\n",maxLAT - two_power(BIT)/2);
-    fprintf(fileOutput,"\n");
-
-    fprintf(fileOutput," ============================================================\n");
-    fprintf(fileOutput," [15] Non-Linierity [SBox AES] :\n");
-    fprintf(fileOutput," ============================================================\n");
-    unsigned int nonLin = sbox_nonlinearity(sbox_aes,m,n);
-    fprintf(fileOutput," Nilai NonLinierity [SBox AES] : %d\n",nonLin);
-    fprintf(fileOutput,"\n");
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput," ==========================Hasil Uji============================\n");
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput,"           |     AC     |    SAC     |    BIC    |     AWD      \n");
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput,"    AES    |   %.5f     %.5f     %lf     %lf\n",maxAC1,maxSAC1,bicAES,maxAWDR1);
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput," Pattimura |   %.5f     %.5f     %lf     %lf\n",maxAC2,maxSAC2,bicPatt,maxAWDR2);
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput,"           |  XorTable  |    LAT     | NonLinier |\n");
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput,"    AES    |     %d           %d           %d\n",maxXor1,lat_aes,nonLin_AES);
+    fprintf(fileOutput," ===============================================================\n");
+    fprintf(fileOutput," Pattimura |     %d           %d           %d\n",maxXor2,lat_patt,nonLin_Patt);
+    fprintf(fileOutput," ===============================================================\n");
 
     time(&stop);
-    fprintf(fileOutput," ========================End of File=========================\n");
+    fprintf(fileOutput," =========================End of File===========================\n");
     fprintf(fileOutput," \t\t\t\t Finnished in %.2f seconds. \n", difftime(stop, start));
 
-    fclose(filePlaintext);      fclose(fileKey);        fclose(fileOutput);
-    fclose(fileAWDFile);        fclose(fileAWDRandom);  fclose(fileXorTablePresent);
-    fclose(fileLATPresent);     fclose(fileLATAES);     fclose(fileXorTableAES);
+    fclose(filePlaintext);      fclose(fileKey);                    fclose(fileOutput);
+    fclose(fileAWDAES);         fclose(fileLATAES);                 fclose(fileXorTableAES);
+    fclose(fileACAES);          fclose(fileSACAES);
+    fclose(fileAWDPattimura);   fclose(fileXorTablePattimura);      fclose(fileLATPattimura);
+    fclose(fileACPattimura);    fclose(fileSACPattimura);
 
-    free(ac);   free(acAlg);    free(acAlgFile);        free(lat_aes);free(lat_present);
-    free(sac);  free(sacAlg);   free(sacAlgFile);       free(xortable_aes); free(xortable_present);
-    free(awd_array_file);       free(awd_array_random); free(binomAll);
+    free(acAES);    free(acPatt);   free(sacAES);   free(sacPatt);
+    free(awdAES);   free(awdPatt);  free(binomAll);
+    free(xortable_aes); free(xortable_patt);
 
     printf("Selesai..\n");
 
