@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include "awd.h"
-#include "aes/aes.h"
 #include "num_utils.h"
+#include "aes/aes.h"
 #include "pattimura/pattimura.h"
 #include "pattimura/utils.h"
+#include "des/des.h"
 
 #define ECB 1
 #define is_bit_set(b, l, p) ((b[p / 8] >> (7 - (p % 8))) & 1)
@@ -44,7 +45,7 @@ byte *generate_random_bytes(unsigned int length) {
 void print_bytes(byte *bytes, unsigned int length) {
     unsigned int i;
     for (i = 0; i < length; ++i) {
-        printf("%02x", bytes[i]);
+        printf("%02x ", bytes[i]);
     }
 }
 
@@ -502,6 +503,48 @@ unsigned int **awd_count_Pattimura_file(FILE *filePlaintext, FILE *fileKey, int 
     return awd_matrix;
 }
 
+unsigned int **awd_count_3DES_file(FILE *filePlaintext, FILE *fileKey, int num_inputs, unsigned int bit_length)
+{
+    unsigned int **awd_matrix = alloc_uint_matrix(bit_length,bit_length +1);
+    unsigned int byte_length = bit_length / 8u;
+    unsigned int i,j;
+    unsigned int w;
+
+    // bit length 3DES : 64 bit
+    // bit key length 3DES : 192bit exclude parity bit
+    byte *key = read_hex_line(fileKey,0,byte_length*6);
+    byte *C  = malloc(byte_length);
+    byte *Ci = malloc(byte_length);
+    byte keySchedule[3][16][6];
+
+    three_des_key_schedule(key,keySchedule,ENCRYPT);
+
+    for (i = 0; i < num_inputs; ++i) {
+        byte *P = read_hex_line(filePlaintext,i,byte_length*2);
+        three_des_crypt(P,C,keySchedule);
+
+        for (j = 0; j < bit_length; ++j) {
+            flip_bit(P, byte_length, j);
+            three_des_crypt(P,Ci,keySchedule);
+
+            byte *Dei = xor_bytes(C, Ci, byte_length);
+            w = hamming_weight_bytes(Dei, byte_length);
+
+            awd_matrix[j][w] += 1;
+            flip_bit(P, byte_length, j);
+
+            free(Dei);
+        }
+        free(P);
+    }
+
+    free(C);
+    free(Ci);
+    free(key);
+
+    return awd_matrix;
+}
+
 double bic_AES_file(FILE *filePlaintext, FILE *fileKey, unsigned int num_inputs, unsigned int bit_length) {
     unsigned int **sum = alloc_uint_matrix(bit_length, bit_length);
     unsigned int ***sumAB = malloc(bit_length * sizeof(unsigned int **));
@@ -870,8 +913,82 @@ unsigned int *awd_binom_distrib(int num_inputs, unsigned int n) {
         2.93873587705572E-039
     };
 
-    for (i = 0; i < n; ++i) {
-        B[i] = round(prob[i] * num_inputs);
+    double prob64[65] = {
+        5.42101086242753E-20,
+        3.4694469519536088E-18,
+        1.0928757898653817E-16,
+        2.2586099657217882E-15,
+        3.444380197725736E-14,
+        4.133256237270889E-13,
+        4.064368633316403E-12,
+        3.3676197247478664E-11,
+        2.3994290538828563E-10,
+        1.4929780779715522E-9,
+        8.211379428843566E-9,
+        4.031040810523205E-8,
+        1.780376357981078E-7,
+        7.121505431924313E-7,
+        2.5942626930581196E-6,
+        8.647542310193761E-6,
+        2.6483098324968583E-5,
+        7.477580703520466E-5,
+        1.9524794059192467E-4,
+        4.7270554038044847E-4,
+        0.0010635874658560087,
+        0.0022284689760792616,
+        0.004355643907791304,
+        0.00795378452727104,
+        0.013587715234088044,
+        0.021740344374540845,
+        0.032610516561811215,
+        0.04589628256847508,
+        0.060648659108342044,
+        0.0752879906172522,
+        0.08783598905346093,
+        0.09633624605863458,
+        0.09934675374796686,
+        0.09633624605863458,
+        0.08783598905346093,
+        0.0752879906172522,
+        0.060648659108342044,
+        0.04589628256847508,
+        0.032610516561811215,
+        0.021740344374540855,
+        0.013587715234088044,
+        0.00795378452727104,
+        0.004355643907791304,
+        0.0022284689760792616,
+        0.0010635874658560087,
+        4.7270554038044847E-4,
+        1.9524794059192467E-4,
+        7.477580703520466E-5,
+        2.648309832496863E-5,
+        8.647542310193761E-6,
+        2.5942626930581196E-6,
+        7.121505431924313E-7,
+        1.7803763579810747E-7,
+        4.031040810523205E-8,
+        8.211379428843566E-9,
+        1.4929780779715468E-9,
+        2.3994290538828563E-10,
+        3.3676197247478664E-11,
+        4.064368633316403E-12,
+        4.133256237270889E-13,
+        3.444380197725749E-14,
+        2.2586099657218044E-15,
+        1.0928757898653895E-16,
+        3.4694469519536088E-18,
+        5.42101086242753E-20
+    };
+
+    if (n == 65) {
+        for (i = 0; i < n; ++i) {
+            B[i] = round(prob64[i] * num_inputs);
+        }
+    } else {
+        for (i = 0; i < n; ++i) {
+            B[i] = round(prob[i] * num_inputs);
+        }
     }
 
     return B;

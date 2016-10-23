@@ -49,6 +49,7 @@ unsigned int sbox_pattimura[256] = {
 
 int main() {
 
+    /** Uji AES dan Pattimura
     unsigned int i,j,m,n;
     unsigned int samples = 10000;
     unsigned int bit_aes = 128;    
@@ -192,6 +193,63 @@ int main() {
     free(xortable_aes); free(xortable_patt);
 
     printf("Selesai..\n");
+    **/
 
+    /** Data Generation 3DES param --> rand()
+    int keyLen = 24, pxLen = 8, n, i, j;
+    unsigned char key[keyLen];
+    unsigned char P[pxLen];
+
+    unsigned s;
+    time_t t;
+    FILE *fout1, *fout2;
+
+    printf("Number of samples: ");
+    scanf("%d", &n);
+
+    fout1 = fopen("key3des.txt", "w");
+    for(i=0; i<keyLen; i++) {
+        key[i] = rand()%256;
+        fprintf(fout1, "%.2x", key[i]);
+    }
+    fprintf(fout1, "\n");
+    fclose(fout1);
+
+    fout2 = fopen("plaintext3des.txt","w");
+    for (j = 0; j < n; ++j) {
+        for (i = 0; i < pxLen; ++i) {
+            P[i] = rand()%256;
+            fprintf(fout2, "%.2x", P[i]);
+        }
+        fprintf(fout2, "\n");
+    }
+    fclose(fout2);
+    **/
+
+    /** Uji 3DES **/
+    int i;
+    int samples = 20000, bit3des = 64;
+    double maxAWDR1 = 0;
+    double resem3DES[64];
+
+    FILE *filePlaintext, *fileKey;
+
+    filePlaintext   = fopen("plaintext3des.txt","r");
+    fileKey         = fopen("key3des.txt","r");
+
+    time_t start, stop;
+    time(&start);
+
+    unsigned int **awd3DES  = awd_count_3DES_file(filePlaintext,fileKey,samples,bit3des);
+    unsigned int *binomAll  = awd_binom_distrib(samples,bit3des +1);
+
+    for (i = 0; i < 64; ++i) {
+        resem3DES[i]     = awd_resemblance(awd3DES[i],binomAll,bit3des +1, samples);
+        if (resem3DES[i] > maxAWDR1)    maxAWDR1 = resem3DES[i];
+    }
+    time(&stop);
+
+    printf("%lf\n",maxAWDR1);
+    printf("%.2f\n",difftime(stop, start));
     return 0;
 }
